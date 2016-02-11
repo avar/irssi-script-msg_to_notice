@@ -15,6 +15,17 @@ $VERSION = "1";
     changed     => '2013-04-24T17:40+0200',
 );
 
+# HOWTO:
+#
+#   /load msg_to_notice.pl
+#   /set noticeable_nicks ~\[bot\]$,~mon-[0-9]+$,~^mon-.*-[0-9]+$,root,deploy,log,jenkins,nagmetoo
+#
+# The nicks that match will be turned into notices, useful for marking
+# bots as such. Note that if the nicks start with ~ the rest is taken
+# to be a regex. Due to limitations of our dummy parser you can't use
+# {x,y} character classes or other regex constructs that require a
+# comma, but usually that's something you can work around.
+
 use constant {
     I_SERVER => 0,
     I_DATA   => 1,
@@ -31,8 +42,15 @@ sub handle_privmsg {
     for my $noticeable_nick ( split /[\s,]+/, Irssi::settings_get_str('noticeable_nicks') ) {
         $noticeable_nick =~ s/\A \s+//x;
         $noticeable_nick =~ s/\s+ \z//x;
+        my $is_regexp; $is_regexp = 1 if $noticeable_nick =~ s/^~//;
 
-        if ( lc $noticeable_nick eq lc $_[I_NICK] ){
+        # Irssi::print("Checking <$_[I_NICK]> to <$noticeable_nick> via <" . ($is_regexp ? "rx" : "eq") . ">");
+        if ( $is_regexp and $_[I_NICK] =~ $noticeable_nick ) {
+            # Irssi::print("Matched <$_[I_NICK]> to <$noticeable_nick> via <rx>");
+            $is_noticeable = 1;
+            last;
+        } elsif ( not $is_regexp and lc $noticeable_nick eq lc $_[I_NICK] ){
+            # Irssi::print("Matched <$_[I_NICK]> to <$noticeable_nick> via <eq>");
             $is_noticeable = 1;
             last;
         }
@@ -43,7 +61,7 @@ sub handle_privmsg {
     Irssi::signal_stop();
 }
 
-Irssi::settings_add_str('msg_to_notice', 'noticeable_nicks', 'root,deploy');
+Irssi::settings_add_str('msg_to_notice', 'noticeable_nicks', '~\[bot\]$,root,deploy');
 Irssi::signal_add('event privmsg', 'handle_privmsg');
 
 # vim: filetype=perl tabstop=4 shiftwidth=4 expandtab cindent:
